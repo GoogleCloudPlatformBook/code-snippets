@@ -17,14 +17,22 @@ import datetime
 import md5
 import sys
 import time
+import json
 
-from OpenSSL.crypto import load_pkcs12, sign
+from OpenSSL.crypto import load_pkcs12, load_privatekey, FILETYPE_PEM, sign
 import requests
 
 GCS_API_ENDPOINT = 'https://storage.googleapis.com'
+
+#### Do not expose the following information -JSON_KEY_PATH, SERVICE_ACCOUNT_EMAIL, PRIVATE_KEY_PATH- in production environments. 
+#### You can this in a configuration file.
+
+# Use this variable when using a JSON key file downloaded from Google Developer Console
+JSON_KEY_PATH = '<path-to-your-json-key-file.json>' 
+
+# Use these variables when downloading the P12 key file directly from Google Developer Console
 SERVICE_ACCOUNT_EMAIL = '<service-account-email>' # *@developer.gserviceaccount.com'
-PRIVATE_KEY_PATH = '<path-to-your-pkcs-key.p12>' # You should not expose this in production environments. 
-                                                  # You can hide that information in a configuration file.
+PRIVATE_KEY_PATH = '<path-to-your-pkcs-key.p12>' 
 
 class GCSUrlSigner(object):
 
@@ -126,12 +134,22 @@ def mockSignedGet(signer):
 
 def main():
 
+    use_json_key = JSON_KEY_PATH is not None and JSON_KEY_PATH != '<path-to-your-json-key-file.json>'
+
     try:
-        key_text = open(PRIVATE_KEY_PATH, 'rb').read()
+        key_text = open(JSON_KEY_PATH if use_json_key else PRIVATE_KEY_PATH, 'rb').read()
     except IOError as e:
         sys.exit('Error while reading private key: %s' % e)
 
-    private_key = load_pkcs12(key_text, 'notasecret') # 'notasecret' is the default password for Google-generated PKCS keys.
+    if use_json_key:
+        json_key = json.loads(key_text)
+        private_key = load_privatekey(FILETYPE_PEM, json_key['private_key'])
+        client_email = json_key['client_email']
+    else:
+        private_key = load_pkcs12(key_text, 'notasecret').get_privatekey() # 'notasecret' is the default password for Google-generated PKCS keys.
+        client_email = SERVICE_ACCOUNT_EMAIL
+
+
     expiration = datetime.datetime.now() + datetime.timedelta(hours = 12)
     url_signer = GCSUrlSigner(private_key, SERVICE_ACCOUNT_EMAIL, expiration)
 
