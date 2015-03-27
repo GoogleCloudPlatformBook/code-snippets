@@ -36,14 +36,14 @@ PRIVATE_KEY_PATH = '<path-to-your-pkcs-key.p12>'
 
 class GCSUrlSigner(object):
 
-    def __init__(self, key, client_id_email, expiration=None):
+    def __init__(self, private_key, client_id_email, expiration=None):
         """
         Keyword arguments:
             key: The private key - OpenSSL::PKey - used to sign the content.
             client_id_email: Email form of the client ID for GCS.
             expiration: An instance of datetime.datetime with the time when the signed URL should expire.
         """
-        self.private_key = key.get_privatekey()
+        self.private_key = private_key
         self.client_id_email = client_id_email
 
         self.expiration = expiration or (datetime.datetime.now() + datetime.timedelta(days=1))
@@ -151,7 +151,7 @@ def main():
 
 
     expiration = datetime.datetime.now() + datetime.timedelta(hours = 12)
-    url_signer = GCSUrlSigner(private_key, SERVICE_ACCOUNT_EMAIL, expiration)
+    url_signer = GCSUrlSigner(private_key, client_email, expiration)
 
     mockSignedPut(url_signer)
     mockSignedGet(url_signer)
