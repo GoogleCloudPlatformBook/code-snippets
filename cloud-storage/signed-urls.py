@@ -118,7 +118,7 @@ def mockSignedPut(signer):
     if response.status_code == 200:
         print 'Put file successfully.'
     else:
-        print 'Error ' + response.status_code
+        print 'Error ' + str(response.status_code) + ' - ' + response.content
 
 
 def mockSignedGet(signer):
@@ -129,7 +129,7 @@ def mockSignedGet(signer):
     if response.status_code == 200:
         print 'Read contents of file:\n' + response.text
     else:
-        print 'Error ' + response.status_code
+        print 'Error ' + str(response.status_code) + ' - ' + response.content
 
 
 def main():
