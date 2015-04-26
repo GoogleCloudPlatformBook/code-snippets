@@ -44,19 +44,23 @@ def list_resource(request, resource_name, page_token=None):
 
 def setupSystem(client):
 
-    print '## Setup'
+    print '\n### Setup'
 
     # 1. Create new topic
     topic_uri = 'projects/%s/topics/%s' % (PROJECT_NAME, TOPIC_NAME)
-    print 'Created topic - %s' % client.projects().topics().create(name=topic_uri, body={}).execute()
+    topic_response = client.projects().topics().create(name=topic_uri, body={}).execute()
+    print 'Created topic - %s' % topic_response.get('name')
 
     # 2. Add a pull subscription to the topic
     subscription_uri = 'projects/%s/subscriptions/%s' % (PROJECT_NAME, SUBSCRIPTION_NAME)
     body = { 'topic': topic_uri, 'ackDeadlineSeconds': 30 }
-    print 'Created subscription - %s' % client.projects().subscriptions().create(name=subscription_uri, body=body).execute()
+    subscription_response = client.projects().subscriptions().create(name=subscription_uri, body=body).execute()
+    print 'Created subscription - %s' % subscription_response.get('name')
 
 
 def publishMessages(client):
+
+    print '\n### Publish messages'
 
     message_data = base64.b64encode('Kepler: Add another potentially habitable planet to my list!')
 
@@ -87,10 +91,13 @@ def publishMessages(client):
         }]
     }
     topic_uri = 'projects/%s/topics/%s' % (PROJECT_NAME, TOPIC_NAME)
-    print 'Published 2 new planets - %s' % client.projects().topics().publish(topic=topic_uri, body=body).execute()
+    publish_response = client.projects().topics().publish(topic=topic_uri, body=body).execute()
+    print 'Published 2 new planets with ids - %s' % publish_response.get('messageIds')
 
 
 def consumeMessages(client):
+
+    print '\n### Consume messages'
     
     max_n_messages = 10
     subscription_uri = 'projects/%s/subscriptions/%s' % (PROJECT_NAME, SUBSCRIPTION_NAME)
@@ -138,7 +145,7 @@ def consumeMessages(client):
 
 def cleanUp(client):
 
-    print '## Clean up'
+    print '\n### Clean up'
 
     # 1. Delete subscription
     subscription_uri = 'projects/%s/subscriptions/%s' % (PROJECT_NAME, SUBSCRIPTION_NAME)
@@ -148,7 +155,8 @@ def cleanUp(client):
     # 2. Delete topic
     topic_uri = 'projects/%s/topics/%s' % (PROJECT_NAME, TOPIC_NAME)
     client.projects().topics().delete(topic=topic_uri).execute()
-    print 'Deleted topic - %s' % topic_uri
+    print 'Deleted topic - %s\n' % topic_uri
+
 
 def main():
 
@@ -160,16 +168,16 @@ def main():
     pubsub_client = discovery.build('pubsub', 'v1beta2', credentials=credentials)
 
     # 1. The system administrator sets up the system, creating a topic and a subscription to track planets
-    #setupSystem(pubsub_client)
+    setupSystem(pubsub_client)
 
     # 2. The telescope publish new messages for the planets found in the last 12 hours
-    #publishMessages(pubsub_client)
+    publishMessages(pubsub_client)
 
     # 3. Your application processes the messages and acknowledges them
     consumeMessages(pubsub_client)
 
-    # X. The project is cleaned up 
-    #cleanUp(pubsub_client)
+    # 4. The project is cleaned up 
+    cleanUp(pubsub_client)
 
 if __name__ == '__main__':
     main()
