@@ -1,0 +1,33 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+sourceCompatibility = '1.7'
+
+mainClassName = 'com.lunchmates.WordCount'
+
+repositories {
+    mavenCentral()
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_7
+targetCompatibility = JavaVersion.VERSION_1_7
+
+dependencies {
+    compile 'com.google.guava:guava:18.0'
+    compile 'com.google.cloud.dataflow:google-cloud-dataflow-java-sdk-all:0.3.150109'
+
+    testCompile 'junit:junit:4.11'
+}
+
+task resources {
+    def resourcesDir = new File('build/resources/main')
+    resourcesDir.mkdirs()
+}
+
+run {
+    if (project.hasProperty('args')) {
+        args project.args.split('\\s')
+    }
+}
+
+run.mustRunAfter 'resources'
