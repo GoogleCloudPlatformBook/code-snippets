@@ -37,30 +37,37 @@ import com.google.cloud.dataflow.sdk.values.PCollection;
 /**
  * An example that counts words in Shakespeare. For a detailed walkthrough of this
  * example see:
- *   https://cloud.google.com/dataflow/java-sdk/wordcount-example
- *
+ * https://cloud.google.com/dataflow/java-sdk/wordcount-example
+ * <p/>
  * <p> Concepts: Reading/writing text files; counting a PCollection; user-defined PTransforms
- *
+ * <p/>
  * <p> To execute this pipeline locally, specify general pipeline configuration:
- *   --project=<PROJECT ID>
+ * --project=<PROJECT ID>
  * and a local output file or output prefix on GCS:
- *   --output=[<LOCAL FILE> | gs://<OUTPUT PREFIX>]
- *
+ * --output=[<LOCAL FILE> | gs://<OUTPUT PREFIX>]
+ * <p/>
  * <p> To execute this pipeline using the Dataflow service, specify pipeline configuration:
- *   --project=<PROJECT ID>
- *   --stagingLocation=gs://<STAGING DIRECTORY>
- *   --runner=BlockingDataflowPipelineRunner
+ * --project=<PROJECT ID>
+ * --stagingLocation=gs://<STAGING DIRECTORY>
+ * --runner=BlockingDataflowPipelineRunner
  * and an output prefix on GCS:
- *   --output=gs://<OUTPUT PREFIX>
- *
+ * --output=gs://<OUTPUT PREFIX>
+ * <p/>
  * <p> The input file defaults to gs://dataflow-samples/shakespeare/kinglear.txt and can be
  * overridden with --input.
  */
-public class WordCount {
+public class LogAnalyzer {
 
-    " "[A-Z]{1,6} [-a-zA-Z0-9@:;%_+.~#?&//=]* HTTP/1.1" ([2345][0-9][0-9]) "
+    " "[A-Z]
 
-    /** A DoFn that tokenizes lines of text into individual words. */
+    {1, 6}
+
+    [-a-zA-Z0-9
+    @ :;%_+.~#?&//=]* HTTP/1.1" ([2345][0-9][0-9]) "
+
+    /**
+     * A DoFn that tokenizes lines of text into individual words.
+     */
     static class GetResponseCodeFn extends DoFn<String, String> {
 
         private static final long serialVersionUID = 0;
@@ -93,7 +100,9 @@ public class WordCount {
         }
     }
 
-    /** A DoFn that converts a Word and Count into a printable string. */
+    /**
+     * A DoFn that converts a Word and Count into a printable string.
+     */
     static class FormatCountsFn extends DoFn<KV<String, Long>, String> {
         private static final long serialVersionUID = 0;
 
@@ -104,12 +113,12 @@ public class WordCount {
     }
 
     /**
-    * A PTransform that converts a PCollection containing lines of text into a PCollection of
-    * formatted word counts.
-    * <p>
-    * Although this pipeline fragment could be inlined, bundling it as a PTransform allows for easy
-    * reuse, modular testing, and an improved monitoring experience.
-    */
+     * A PTransform that converts a PCollection containing lines of text into a PCollection of
+     * formatted word counts.
+     * <p/>
+     * Although this pipeline fragment could be inlined, bundling it as a PTransform allows for easy
+     * reuse, modular testing, and an improved monitoring experience.
+     */
     public static class ExtractLogExperience extends PTransform<PCollection<String>, PCollection<String>> {
         private static final long serialVersionUID = 0;
 
@@ -130,23 +139,25 @@ public class WordCount {
     }
 
     /**
-    * Allowed set of options for this script
-    */
+     * Allowed set of options for this script
+     */
     public static interface AllowedOptions extends PipelineOptions {
 
         @Description("Default path for logs file")
         @Default.String("gs://lunchmates_logs/access.log")
         String getInput();
+
         void setInput(String value);
 
         @Description("Path of the file to write to")
         @Default.InstanceFactory(OutputFactory.class)
         String getOutput();
+
         void setOutput(String value);
 
         /**
-        * Stores the result under gs://${STAGING_LOCATION}/"results.txt" by default.
-        */
+         * Stores the result under gs://${STAGING_LOCATION}/"results.txt" by default.
+         */
         public static class OutputFactory implements DefaultValueFactory<String> {
 
             @Override
@@ -162,11 +173,12 @@ public class WordCount {
         }
 
         /**
-        * By default (numShards == 0), the system will choose the shard count.
-        * Most programs will not need this option.
-        */
+         * By default (numShards == 0), the system will choose the shard count.
+         * Most programs will not need this option.
+         */
         @Description("Number of output shards (0 if the system should choose automatically)")
         int getNumShards();
+
         void setNumShards(int value);
     }
 
@@ -176,9 +188,9 @@ public class WordCount {
         Pipeline p = Pipeline.create(options);
 
         p.apply(TextIO.Read.named("ReadLines").from(options.getInput()))
-        .apply(new CountWords())
-        .apply(TextIO.Write.named("WriteCounts")
-        .to(options.getOutput()).withNumShards(options.getNumShards()));
+         .apply(new CountWords())
+         .apply(TextIO.Write.named("WriteCounts")
+                            .to(options.getOutput()).withNumShards(options.getNumShards()));
 
         p.run();
     }
