@@ -3,7 +3,7 @@ apply plugin: 'application'
 
 sourceCompatibility = '1.7'
 
-mainClassName = 'com.lunchmates.WordCount'
+mainClassName = 'com.lunchmates.LogAnalyzer'
 
 repositories {
     mavenCentral()

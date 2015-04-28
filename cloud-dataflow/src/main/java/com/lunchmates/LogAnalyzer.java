@@ -16,6 +16,10 @@
 
 package com.lunchmates;
 
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.google.cloud.dataflow.sdk.Pipeline;
 import com.google.cloud.dataflow.sdk.io.TextIO;
 import com.google.cloud.dataflow.sdk.options.DataflowPipelineOptions;
@@ -24,12 +28,12 @@ import com.google.cloud.dataflow.sdk.options.DefaultValueFactory;
 import com.google.cloud.dataflow.sdk.options.Description;
 import com.google.cloud.dataflow.sdk.options.PipelineOptions;
 import com.google.cloud.dataflow.sdk.options.PipelineOptionsFactory;
-import com.google.cloud.dataflow.sdk.transforms.Aggregator;
 import com.google.cloud.dataflow.sdk.transforms.Count;
 import com.google.cloud.dataflow.sdk.transforms.DoFn;
 import com.google.cloud.dataflow.sdk.transforms.PTransform;
 import com.google.cloud.dataflow.sdk.transforms.ParDo;
-import com.google.cloud.dataflow.sdk.transforms.Sum;
+import com.google.cloud.dataflow.sdk.transforms.SerializableComparator;
+import com.google.cloud.dataflow.sdk.transforms.Top;
 import com.google.cloud.dataflow.sdk.util.gcsfs.GcsPath;
 import com.google.cloud.dataflow.sdk.values.KV;
 import com.google.cloud.dataflow.sdk.values.PCollection;
@@ -58,12 +62,7 @@ import com.google.cloud.dataflow.sdk.values.PCollection;
  */
 public class LogAnalyzer {
 
-    " "[A-Z]
-
-    {1, 6}
-
-    [-a-zA-Z0-9
-    @ :;%_+.~#?&//=]* HTTP/1.1" ([2345][0-9][0-9]) "
+    private static final String RESPONSE_CODE_PATTERN = "HTTP.[0-9]\\.?[0-9]\" ([2345][0-9][0-9])";
 
     /**
      * A DoFn that tokenizes lines of text into individual words.
@@ -71,44 +70,58 @@ public class LogAnalyzer {
     static class GetResponseCodeFn extends DoFn<String, String> {
 
         private static final long serialVersionUID = 0;
+        private static final Pattern pattern = Pattern.compile(RESPONSE_CODE_PATTERN);
 
-        private Aggregator<Long> emptyLines;
+        public GetResponseCodeFn() {
 
-        @Override
-        public void startBundle(Context c) {
-            emptyLines = c.createAggregator("emptyLines", new Sum.SumLongFn());
         }
 
         @Override
-        public void processElement(ProcessContext c) {
+        public void processElement(ProcessContext context) {
 
-            // Keep track of the number of empty lines. (When using the [Blocking]DataflowPipelineRunner,
-            // Aggregators are shown in the monitoring UI.)
-            if (c.element().trim().isEmpty()) {
-                emptyLines.addValue(1L);
-            }
-
-            // Split the line into words.
-            String[] words = c.element().split("[^a-zA-Z']+");
+            // Find matches to regex
+            Matcher matcher = pattern.matcher(context.element());
 
             // Output each word encountered into the output PCollection.
-            for (String word : words) {
-                if (!word.isEmpty()) {
-                    c.output(word);
-                }
+            if (matcher.find()) {
+                context.output(matcher.group(1));
             }
         }
     }
 
     /**
-     * A DoFn that converts a Word and Count into a printable string.
+     * Computes the longest session ending in each month.
      */
-    static class FormatCountsFn extends DoFn<KV<String, Long>, String> {
+    private static class TopCodes
+            extends PTransform<PCollection<KV<String, Long>>, PCollection<List<KV<String, Long>>>> {
+
         private static final long serialVersionUID = 0;
 
         @Override
-        public void processElement(ProcessContext c) {
-            c.output(c.element().getKey() + ": " + c.element().getValue());
+        public PCollection<List<KV<String, Long>>> apply(PCollection<KV<String, Long>> responseCodes) {
+
+            return responseCodes.apply(Top.of(5, new SerializableComparator<KV<String, Long>>() {
+                private static final long serialVersionUID = 0;
+
+                @Override
+                public int compare(KV<String, Long> o1, KV<String, Long> o2) {
+                    return Long.compare(o1.getValue(), o2.getValue());
+                }
+            }));
+        }
+    }
+
+    /**
+     * A DoFn that converts a response code result into a string that can be processed by another routine.
+     */
+    static class FormatResultsFn extends DoFn<List<KV<String, Long>>, String> {
+        private static final long serialVersionUID = 0;
+
+        @Override
+        public void processElement(ProcessContext context) {
+            for (KV<String, Long> item : context.element()) {
+                context.output(item.getKey() + "|" + item.getValue());
+            }
         }
     }
 
@@ -128,11 +141,14 @@ public class LogAnalyzer {
             // Filter line content to leave method alone
             PCollection<String> responseCodes = lines.apply(ParDo.of(new GetResponseCodeFn()));
 
-            // Count the number of times each word occurs.
-            PCollection<KV<String, Long>> wordCounts = words.apply(Count.<String>perElement());
+            // Counts occurrences for each response code found
+            PCollection<KV<String, Long>> responseCodeResults = responseCodes.apply(Count.<String>perElement());
+
+            // Get the top three response codes
+            PCollection<List<KV<String, Long>>> topThreeResponseCodes = responseCodeResults.apply(new TopCodes());
 
             // Format each word and count into a printable string.
-            PCollection<String> results = wordCounts.apply(ParDo.of(new FormatCountsFn()));
+            PCollection<String> results = topThreeResponseCodes.apply(ParDo.of(new FormatResultsFn()));
 
             return results;
         }
@@ -165,7 +181,7 @@ public class LogAnalyzer {
 
                 DataflowPipelineOptions dataflowOptions = options.as(DataflowPipelineOptions.class);
                 if (dataflowOptions.getStagingLocation() != null) {
-                    return GcsPath.fromUri(dataflowOptions.getStagingLocation()).resolve("counts.txt").toString();
+                    return GcsPath.fromUri(dataflowOptions.getStagingLocation()).resolve("results.txt").toString();
                 } else {
                     throw new IllegalArgumentException("Must specify --output or --stagingLocation");
                 }
@@ -188,7 +204,7 @@ public class LogAnalyzer {
         Pipeline p = Pipeline.create(options);
 
         p.apply(TextIO.Read.named("ReadLines").from(options.getInput()))
-         .apply(new CountWords())
+         .apply(new ExtractLogExperience())
          .apply(TextIO.Write.named("WriteCounts")
                             .to(options.getOutput()).withNumShards(options.getNumShards()));
 
