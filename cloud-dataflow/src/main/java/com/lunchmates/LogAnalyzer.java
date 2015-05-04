@@ -22,9 +22,7 @@ import java.util.regex.Pattern;
 
 import com.google.cloud.dataflow.sdk.Pipeline;
 import com.google.cloud.dataflow.sdk.io.TextIO;
-import com.google.cloud.dataflow.sdk.options.DataflowPipelineOptions;
 import com.google.cloud.dataflow.sdk.options.Default;
-import com.google.cloud.dataflow.sdk.options.DefaultValueFactory;
 import com.google.cloud.dataflow.sdk.options.Description;
 import com.google.cloud.dataflow.sdk.options.PipelineOptions;
 import com.google.cloud.dataflow.sdk.options.PipelineOptionsFactory;
@@ -34,7 +32,6 @@ import com.google.cloud.dataflow.sdk.transforms.PTransform;
 import com.google.cloud.dataflow.sdk.transforms.ParDo;
 import com.google.cloud.dataflow.sdk.transforms.SerializableComparator;
 import com.google.cloud.dataflow.sdk.transforms.Top;
-import com.google.cloud.dataflow.sdk.util.gcsfs.GcsPath;
 import com.google.cloud.dataflow.sdk.values.KV;
 import com.google.cloud.dataflow.sdk.values.PCollection;
 
@@ -62,27 +59,23 @@ import com.google.cloud.dataflow.sdk.values.PCollection;
  */
 public class LogAnalyzer {
 
-    private static final String RESPONSE_CODE_PATTERN = "HTTP.[0-9]\\.?[0-9]\" ([2345][0-9][0-9])";
-
     /**
-     * A DoFn that tokenizes lines of text into individual words.
+     * A DoFn that extracts the response codes for the attached logs.
      */
-    static class GetResponseCodeFn extends DoFn<String, String> {
+    private static class GetResponseCodeFn extends DoFn<String, String> {
 
-        private static final long serialVersionUID = 0;
+        private static final long serialVersionUID = 523830295815285124L;
+
+        private static final String RESPONSE_CODE_PATTERN = "HTTP[0-9./]{2,6}\" ([2345][0-9][0-9])";
         private static final Pattern pattern = Pattern.compile(RESPONSE_CODE_PATTERN);
-
-        public GetResponseCodeFn() {
-
-        }
 
         @Override
         public void processElement(ProcessContext context) {
 
-            // Find matches to regex
+            //  Find matches for the specified regular expression
             Matcher matcher = pattern.matcher(context.element());
 
-            // Output each word encountered into the output PCollection.
+            // Output each response code into the resulting PCollection
             if (matcher.find()) {
                 context.output(matcher.group(1));
             }
@@ -90,18 +83,18 @@ public class LogAnalyzer {
     }
 
     /**
-     * Computes the longest session ending in each month.
+     * Returns the top response codes in the logs
      */
     private static class TopCodes
             extends PTransform<PCollection<KV<String, Long>>, PCollection<List<KV<String, Long>>>> {
 
-        private static final long serialVersionUID = 0;
+        private static final long serialVersionUID = 725379821789521L;
 
         @Override
         public PCollection<List<KV<String, Long>>> apply(PCollection<KV<String, Long>> responseCodes) {
 
             return responseCodes.apply(Top.of(5, new SerializableComparator<KV<String, Long>>() {
-                private static final long serialVersionUID = 0;
+                private static final long serialVersionUID = 23407910892310L;
 
                 @Override
                 public int compare(KV<String, Long> o1, KV<String, Long> o2) {
@@ -114,8 +107,8 @@ public class LogAnalyzer {
     /**
      * A DoFn that converts a response code result into a string that can be processed by another routine.
      */
-    static class FormatResultsFn extends DoFn<List<KV<String, Long>>, String> {
-        private static final long serialVersionUID = 0;
+    private static class FormatResultsFn extends DoFn<List<KV<String, Long>>, String> {
+        private static final long serialVersionUID = 8912558892015809521L;
 
         @Override
         public void processElement(ProcessContext context) {
@@ -133,24 +126,28 @@ public class LogAnalyzer {
      * reuse, modular testing, and an improved monitoring experience.
      */
     public static class ExtractLogExperience extends PTransform<PCollection<String>, PCollection<String>> {
-        private static final long serialVersionUID = 0;
+        private static final long serialVersionUID = 9082135890251890235L;
 
         @Override
         public PCollection<String> apply(PCollection<String> lines) {
 
-            // Filter line content to leave method alone
-            PCollection<String> responseCodes = lines.apply(ParDo.of(new GetResponseCodeFn()));
+            // 1. Filter log line to extract responde code
+            PCollection<String> responseCodes = lines.apply(ParDo.named("Extract Response Codes")
+                                                                 .of(new GetResponseCodeFn()));
 
-            // Counts occurrences for each response code found
-            PCollection<KV<String, Long>> responseCodeResults = responseCodes.apply(Count.<String>perElement());
+            // 2. Counts occurrences for each response code found
+            PCollection<KV<String, Long>> responseCodeResults = responseCodes
+                    .apply(Count.<String>perElement()
+                                .withName("Count Response Codes"));
 
-            // Get the top three response codes
-            PCollection<List<KV<String, Long>>> topThreeResponseCodes = responseCodeResults.apply(new TopCodes());
+            // 3. Get the top five response codes
+            PCollection<List<KV<String, Long>>> topThreeResponseCodes = responseCodeResults
+                    .apply(new TopCodes()
+                            .withName("Get Top Codes"));
 
-            // Format each word and count into a printable string.
-            PCollection<String> results = topThreeResponseCodes.apply(ParDo.of(new FormatResultsFn()));
-
-            return results;
+            // 4. Format each word and count into a printable string.
+            return topThreeResponseCodes.apply(ParDo.named("Format Output")
+                                                    .of(new FormatResultsFn()));
         }
     }
 
@@ -159,56 +156,32 @@ public class LogAnalyzer {
      */
     public static interface AllowedOptions extends PipelineOptions {
 
-        @Description("Default path for logs file")
+        @Description("Default path to logs file")
         @Default.String("gs://lunchmates_logs/access.log")
         String getInput();
 
         void setInput(String value);
 
-        @Description("Path of the file to write to")
-        @Default.InstanceFactory(OutputFactory.class)
+        @Description("Path of the file to write the results to")
+        @Default.String("gs://lunchmates_logs/output/results.txt")
         String getOutput();
 
         void setOutput(String value);
-
-        /**
-         * Stores the result under gs://${STAGING_LOCATION}/"results.txt" by default.
-         */
-        public static class OutputFactory implements DefaultValueFactory<String> {
-
-            @Override
-            public String create(PipelineOptions options) {
-
-                DataflowPipelineOptions dataflowOptions = options.as(DataflowPipelineOptions.class);
-                if (dataflowOptions.getStagingLocation() != null) {
-                    return GcsPath.fromUri(dataflowOptions.getStagingLocation()).resolve("results.txt").toString();
-                } else {
-                    throw new IllegalArgumentException("Must specify --output or --stagingLocation");
-                }
-            }
-        }
-
-        /**
-         * By default (numShards == 0), the system will choose the shard count.
-         * Most programs will not need this option.
-         */
-        @Description("Number of output shards (0 if the system should choose automatically)")
-        int getNumShards();
-
-        void setNumShards(int value);
     }
 
     public static void main(String[] args) {
 
         AllowedOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().as(AllowedOptions.class);
-        Pipeline p = Pipeline.create(options);
+        Pipeline pipeline = Pipeline.create(options);
 
-        p.apply(TextIO.Read.named("ReadLines").from(options.getInput()))
-         .apply(new ExtractLogExperience())
-         .apply(TextIO.Write.named("WriteCounts")
-                            .to(options.getOutput()).withNumShards(options.getNumShards()));
+        pipeline.apply(TextIO.Read.named("Read Input").from(options.getInput()))
+                .apply(new ExtractLogExperience().withName("Extract Logs UX"))
+                .apply(TextIO.Write.named("Write Results")
+                                   .to(options.getOutput())
+                                   .withSuffix(".txt"));
 
-        p.run();
+        pipeline.run();
     }
+
 }
 
