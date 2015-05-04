@@ -23,6 +23,7 @@ def main():
 
 	# 1. Load credentials from default account
 	credentials = GoogleCredentials.get_application_default()
+	# credentials = GoogleCredentials.from_stream(<path-to-json-key>) # Use this to load a custom JSON key
 
 	if credentials.create_scoped_required():
 		credentials = credentials.create_scoped(CLOUD_STORAGE_SCOPE)
