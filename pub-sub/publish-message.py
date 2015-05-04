@@ -160,8 +160,8 @@ def cleanUp(client):
 
 def main():
 
-    #credentials = GoogleCredentials.get_application_default()
-    credentials = GoogleCredentials.from_stream('../keys/Looking for Habitable Planets-b3f2fdf03073.json')
+    # credentials = GoogleCredentials.from_stream(<path-to-json-key>) # Use this to load a custom JSON key
+    credentials = GoogleCredentials.get_application_default()
     if credentials.create_scoped_required():
         credentials = credentials.create_scoped(PUBSUB_API_SCOPE)
 
