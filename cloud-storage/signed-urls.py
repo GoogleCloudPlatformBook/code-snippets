@@ -1,4 +1,4 @@
-# Copyright 2015 Google Cloud Platform Book ISBN - 978-1-4842-1005-5_Krishnan_Ch01_The Basics of Cloud Computing
+# Copyright 2015 Google Cloud Platform Book ISBN - 978-1-4842-1005-5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import requests
 
 GCS_API_ENDPOINT = 'https://storage.googleapis.com'
 
-#### Do not expose the following information -JSON_KEY_PATH, SERVICE_ACCOUNT_EMAIL, PRIVATE_KEY_PATH- in production environments. 
+#### Do not expose the following information -JSON_KEY_PATH, SERVICE_ACCOUNT_EMAIL, PRIVATE_KEY_PATH- publicly. 
 #### You can this in a configuration file.
 
 # Use this variable when using a JSON key file downloaded from Google Developer Console
