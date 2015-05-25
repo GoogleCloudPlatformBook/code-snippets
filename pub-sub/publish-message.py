@@ -23,16 +23,20 @@ PROJECT_NAME = 'earth-is-a-strange-place'
 TOPIC_NAME = 'habitable-planets'
 SUBSCRIPTION_NAME = 'new-habitable-planets-notifier'
 
-'''  
-This sample code composes a signer object used to construct signed urls according to the specified params.
-In this the following test case, a new object is created and uploaded to Datastore to be further read, both through signed urls.
-Thus, note that no authorization mechanisms are needed once the signed url is generated.
-'''
+
+"""This sample code composes a signer object used to construct signed URLs
+according to the specified params. In this the following test case,
+a new object is created and uploaded to Datastore to be further read,
+both through signed urls. Thus, note that no authorization mechanisms are
+needed once the signed url is generated."""
+
 
 def list_resource(request, resource_name, page_token=None):
 
     # List resources for project and page token. Retry once in case of failure
-    response = request.list(project='projects/%s' % PROJECT_NAME, pageToken=page_token).execute(num_retries=1)
+    response = request.list(project='projects/%s' % PROJECT_NAME,
+                            pageToken=page_token).execute(num_retries=1)
+
     for resource in response[resource_name]:
         print resource
 
@@ -48,13 +52,19 @@ def setupSystem(client):
 
     # 1. Create new topic
     topic_uri = 'projects/%s/topics/%s' % (PROJECT_NAME, TOPIC_NAME)
-    topic_response = client.projects().topics().create(name=topic_uri, body={}).execute()
+    topic_response = client.projects().topics().create(
+        name=topic_uri, body={}).execute()
+
     print 'Created topic - %s' % topic_response.get('name')
 
     # 2. Add a pull subscription to the topic
-    subscription_uri = 'projects/%s/subscriptions/%s' % (PROJECT_NAME, SUBSCRIPTION_NAME)
-    body = { 'topic': topic_uri, 'ackDeadlineSeconds': 30 }
-    subscription_response = client.projects().subscriptions().create(name=subscription_uri, body=body).execute()
+    subscription_uri = 'projects/%s/subscriptions/%s' % (
+        PROJECT_NAME, SUBSCRIPTION_NAME)
+
+    body = {'topic': topic_uri, 'ackDeadlineSeconds': 30}
+    subscription_response = client.projects().subscriptions().create(
+        name=subscription_uri, body=body).execute()
+
     print 'Created subscription - %s' % subscription_response.get('name')
 
 
@@ -62,12 +72,12 @@ def publishMessages(client):
 
     print '\n### Publish messages'
 
-    message_data = base64.b64encode('Kepler: Add another potentially habitable planet to my list!')
+    message_data = base64.b64encode(
+        'Kepler: Add another potentially habitable planet to my list!')
 
     # Create a POST body for the request Pub/Sub request
     body = {
-        'messages': [
-        {
+        'messages': [{
             'data': message_data,
             'attributes':
             {
@@ -77,8 +87,7 @@ def publishMessages(client):
                 'declination': '+41deg 57m 3.93s',
                 'telescope': 'Kepler'
             }
-        },
-        {
+        }, {
             'data': message_data,
             'attributes':
             {
@@ -91,25 +100,31 @@ def publishMessages(client):
         }]
     }
     topic_uri = 'projects/%s/topics/%s' % (PROJECT_NAME, TOPIC_NAME)
-    publish_response = client.projects().topics().publish(topic=topic_uri, body=body).execute()
-    print 'Published 2 new planets with ids - %s' % publish_response.get('messageIds')
+    publish_response = client.projects().topics().publish(
+        topic=topic_uri, body=body).execute()
+
+    print 'Published 2 new planets with ids - %s' % publish_response.get(
+        'messageIds')
 
 
 def consumeMessages(client):
 
     print '\n### Consume messages'
-    
+
     max_n_messages = 10
-    subscription_uri = 'projects/%s/subscriptions/%s' % (PROJECT_NAME, SUBSCRIPTION_NAME)
+    subscription_uri = 'projects/%s/subscriptions/%s' % (
+        PROJECT_NAME, SUBSCRIPTION_NAME)
 
     body = {
-        # If returnImmediately is set to False, the request waits until enough messages are added
-        # to the queue up to the maximum specified or the request times out. Otherwise it returns immediately
+        # If returnImmediately is set to False, the request waits until
+        # enough messages are added to the queue up to the maximum specified
+        # or the request times out. Otherwise it returns immediately.
         'returnImmediately': True,
         'maxMessages': max_n_messages,
     }
 
-    messages_response = client.projects().subscriptions().pull(subscription=subscription_uri, body=body).execute()
+    messages_response = client.projects().subscriptions().pull(
+        subscription=subscription_uri, body=body).execute()
 
     received_messages = messages_response.get('receivedMessages')
     if received_messages is not None:
@@ -123,24 +138,27 @@ def consumeMessages(client):
                 data = base64.b64decode(str(pubsub_message.get('data')))
                 attributes = pubsub_message.get('attributes')
                 if attributes is not None:
-                    print 'Processing habitable planet candidate: ' + attributes['candidate_name']
+
+                    print 'Processing habitable planet candidate: %s'
+                    + attributes['candidate_name']
 
                     # Tasks to do:
                     #
-                    # 1. Check if a planet with the same discovery timestamp and 
-                    # celestial coordinates (right_ascension | declination) has been already stored and return if that is the case. 
+                    # 1. Check if a planet with the same discovery timestamp
+                    # and celestial coordinates (right_ascension | declination)
+                    #  has been already stored and return if that is the case.
                     #
                     # 2. Store new planet candidate in your database
                     #
-                    # 3. Notify the interested parties by yemail 
-                
-                    # Append the acknowledgement id to the list for a batched ack request
+                    # 3. Notify the interested parties by email
+
+                    # Append the acknowledgement id to the batch ack id list
                     ack_ids.append(message.get('ackId'))
 
-
-        # After the messages have been processed, a acknowledgement is sent for those processed successfully
+        # Send acknowledgement for the messages processed succesfully
         ack_body = {'ackIds': ack_ids}
-        client.projects().subscriptions().acknowledge(subscription=subscription_uri, body=ack_body).execute()
+        client.projects().subscriptions().acknowledge(
+            subscription=subscription_uri, body=ack_body).execute()
 
 
 def cleanUp(client):
@@ -148,8 +166,12 @@ def cleanUp(client):
     print '\n### Clean up'
 
     # 1. Delete subscription
-    subscription_uri = 'projects/%s/subscriptions/%s' % (PROJECT_NAME, SUBSCRIPTION_NAME)
-    client.projects().subscriptions().delete(subscription=subscription_uri).execute()
+    subscription_uri = 'projects/%s/subscriptions/%s' % (
+        PROJECT_NAME, SUBSCRIPTION_NAME)
+
+    client.projects().subscriptions().delete(
+        subscription=subscription_uri).execute()
+
     print 'Deleted subscription - %s' % subscription_uri
 
     # 2. Delete topic
@@ -160,23 +182,28 @@ def cleanUp(client):
 
 def main():
 
-    # credentials = GoogleCredentials.from_stream(<path-to-json-key>) # Use this to load a custom JSON key
     credentials = GoogleCredentials.get_application_default()
+
+    # Alternatively you can load a custom JSON key
+    # credentials = GoogleCredentials.from_stream(<path-to-json-key>)
+
     if credentials.create_scoped_required():
         credentials = credentials.create_scoped(PUBSUB_API_SCOPE)
 
-    pubsub_client = discovery.build('pubsub', 'v1beta2', credentials=credentials)
+    pubsub_client = discovery.build('pubsub', 'v1beta2',
+                                    credentials=credentials)
 
-    # 1. The system administrator sets up the system, creating a topic and a subscription to track planets
+    # 1. The system administrator sets up the system, creating a topic
+    # and a subscription to track planets
     setupSystem(pubsub_client)
 
-    # 2. The telescope publish new messages for the planets found in the last 12 hours
+    # 2. The telescope publishes messages for planets found in the last 12 h
     publishMessages(pubsub_client)
 
     # 3. Your application processes the messages and acknowledges them
     consumeMessages(pubsub_client)
 
-    # 4. The project is cleaned up 
+    # 4. The project is cleaned up
     cleanUp(pubsub_client)
 
 if __name__ == '__main__':
