@@ -44,7 +44,7 @@ coverage.xml
 *.mo
 *.pot
 
-# Django stuff:
+# Log files:
 *.log
 
 # Sphinx documentation
@@ -57,4 +57,4 @@ cloud-dataflow/.gradle
 *.iml
 cloud-dataflow/.idea
 *.properties
-results.txt-00000-of-00001.txt
+cloud-dataflow/results*
