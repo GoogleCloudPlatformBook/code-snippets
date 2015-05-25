@@ -36,31 +36,29 @@ import com.google.cloud.dataflow.sdk.values.KV;
 import com.google.cloud.dataflow.sdk.values.PCollection;
 
 /**
- * An example that counts words in Shakespeare. For a detailed walkthrough of this
- * example see:
- * https://cloud.google.com/dataflow/java-sdk/wordcount-example
- * <p/>
- * <p> Concepts: Reading/writing text files; counting a PCollection; user-defined PTransforms
- * <p/>
- * <p> To execute this pipeline locally, specify general pipeline configuration:
- * --project=<PROJECT ID>
- * and a local output file or output prefix on GCS:
- * --output=[<LOCAL FILE> | gs://<OUTPUT PREFIX>]
- * <p/>
- * <p> To execute this pipeline using the Dataflow service, specify pipeline configuration:
- * --project=<PROJECT ID>
- * --stagingLocation=gs://<STAGING DIRECTORY>
- * --runner=BlockingDataflowPipelineRunner
- * and an output prefix on GCS:
- * --output=gs://<OUTPUT PREFIX>
- * <p/>
- * <p> The input file defaults to gs://dataflow-samples/shakespeare/kinglear.txt and can be
- * overridden with --input.
+ * This example extracts the most common response code occurrences from a typical HTTP log file using Cloud
+ * Dataflow. It does so, by applying PTransforms to the selected data (a log file) referenced using the --input
+ * parameter. In this routine, as you can see in @{link AllowedOptions}, if the input is not specified,
+ * gs://lunchmates_logs/access.log is used as a default value. The default value for the output is also
+ * specified: gs://lunchmates_logs/output/results.txt
+ * <p> To execute this job locally, use the DirectPipelineRunner:
+ * --runner=DirectPipelineRunner
+ * --project=&lt;PROJECT ID&gt;
+ * and specify an output file to store the results:
+ * --output=[&lt;LOCAL FILE&gt; | gs://&lt;OUTPUT PREFIX&gt; | &lt;OTHER DATA SINK&gt;]
+ * <p> To execute this pipeline using the Dataflow service, use one of the DataflowPipelineRunner or
+ * BlockingDataflowPipelineRunner runners (async- or synchronous respectively). You must also specify a
+ * --stagingLocation used to place temporary and and build files that the system needs to execute your pipeline:
+ * --runner=[DataflowPipelineRunner | BlockingDataflowPipelineRunner]
+ * --project=&lt;PROJECT ID&gt;
+ * --stagingLocation=gs://&lt;STAGING DIRECTORY&gt;
+ * and specify an output file to store the results:
+ * --output=[gs://&lt;OUTPUT PREFIX&gt; | &lt;OTHER DATA SINK&gt;]
  */
 public class LogAnalyzer {
 
     /**
-     * A DoFn that extracts the response codes for the attached logs.
+     * Extracts the response codes for the attached logs.
      */
     private static class GetResponseCodeFn extends DoFn<String, String> {
 
@@ -88,7 +86,7 @@ public class LogAnalyzer {
     private static class TopCodes
             extends PTransform<PCollection<KV<String, Long>>, PCollection<List<KV<String, Long>>>> {
 
-        private static final long serialVersionUID = 725379821789521L;
+        private static final long serialVersionUID = 725379821789521L; // PTransform implements @{link Serializable}
 
         @Override
         public PCollection<List<KV<String, Long>>> apply(PCollection<KV<String, Long>> responseCodes) {
@@ -105,7 +103,7 @@ public class LogAnalyzer {
     }
 
     /**
-     * A DoFn that converts a response code result into a string that can be processed by another routine.
+     * Converts a response code result into a string that can be processed by another routine.
      */
     private static class FormatResultsFn extends DoFn<List<KV<String, Long>>, String> {
         private static final long serialVersionUID = 8912558892015809521L;
@@ -119,9 +117,8 @@ public class LogAnalyzer {
     }
 
     /**
-     * A PTransform that converts a PCollection containing lines of text into a PCollection of
-     * formatted word counts.
-     * <p/>
+     * This composite PTransform converts a PCollection containing lines of text into a PCollection with the top
+     * five response codes in the HTTP log file used in the input.
      * Although this pipeline fragment could be inlined, bundling it as a PTransform allows for easy
      * reuse, modular testing, and an improved monitoring experience.
      */
@@ -131,7 +128,7 @@ public class LogAnalyzer {
         @Override
         public PCollection<String> apply(PCollection<String> lines) {
 
-            // 1. Filter log line to extract responde code
+            // 1. Filter log line to extract response codes
             PCollection<String> responseCodes = lines.apply(ParDo.named("Extract Response Codes")
                                                                  .of(new GetResponseCodeFn()));
 
@@ -154,7 +151,7 @@ public class LogAnalyzer {
     /**
      * Allowed set of options for this script
      */
-    public static interface AllowedOptions extends PipelineOptions {
+    public interface AllowedOptions extends PipelineOptions {
 
         @Description("Default path to logs file")
         @Default.String("gs://lunchmates_logs/access.log")
@@ -162,7 +159,7 @@ public class LogAnalyzer {
 
         void setInput(String value);
 
-        @Description("Path of the file to write the results to")
+        @Description("Path to the file with the results")
         @Default.String("gs://lunchmates_logs/output/results.txt")
         String getOutput();
 
@@ -182,6 +179,5 @@ public class LogAnalyzer {
 
         pipeline.run();
     }
-
 }
 
