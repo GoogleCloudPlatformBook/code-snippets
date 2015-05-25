@@ -19,25 +19,30 @@ from apiclient.discovery import build
 
 CLOUD_STORAGE_SCOPE = 'https://www.googleapis.com/auth/devstorage.read_only'
 
+
 def main():
 
-	# 1. Load credentials from default account
-	credentials = GoogleCredentials.get_application_default()
-	# credentials = GoogleCredentials.from_stream(<path-to-json-key>) # Use this to load a custom JSON key
+    # 1. Load credentials from default account
+    credentials = GoogleCredentials.get_application_default()
 
-	if credentials.create_scoped_required():
-		credentials = credentials.create_scoped(CLOUD_STORAGE_SCOPE)
+    # Alternatively you can load a custom JSON key
+    # credentials = GoogleCredentials.from_stream(<path-to-json-key>)
 
-	# If you want to generate and show the current access token
-	# from httplib2 import Http
-	# credentials._refresh(Http().request)
-	# print credentials.access_token
+    if credentials.create_scoped_required():
+        credentials = credentials.create_scoped(CLOUD_STORAGE_SCOPE)
 
-	# 2. Access API using apiclient.discovery
-	gcs_service = build('storage', 'v1', credentials=credentials)
-	content = gcs_service.objects().list(bucket='lunchmates_document_dropbox').execute()
+    # If you want to generate and show the current access token:
+    # from httplib2 import Http
+    # credentials._refresh(Http().request)
+    # print credentials.access_token
 
-	print json.dumps(content)
+    # 2. Access API using apiclient.discovery
+    gcs_service = build('storage', 'v1', credentials=credentials)
+    content = gcs_service.objects().list(
+        bucket='lunchmates_document_dropbox').execute()
+
+    print json.dumps(content)
+
 
 if __name__ == '__main__':
     main()
