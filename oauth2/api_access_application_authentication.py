@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from __future__ import print_function
 import json
 
 from oauth2client.client import GoogleCredentials
@@ -41,7 +41,7 @@ def main():
     content = gcs_service.objects().list(
         bucket='lunchmates_document_dropbox').execute()
 
-    print json.dumps(content)
+    print(json.dumps(content))
 
 
 if __name__ == '__main__':
